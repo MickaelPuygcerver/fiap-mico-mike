@@ -5,30 +5,34 @@ var player;
 var cursors;
 var pontuacao = 0;
 var pontuacaoText;
+var levelText;
 var gameOver = false;
 var count = 0;
 var countLimite = 200;
+var level = 1;
+var trees;
+var platformVelocity;
+var seconds = 0;
 
 var gameOptions = {
     gravity: 900,
 
     playerStartXY: [100, 300],
     playerBounce: 0,
-    playerJump: 400,
-
+    playerJump: 300,
 
     platformX: 584,
     platformY: 584,
-    platformSpeedRange: [200, 200],
+    platformSpeedRange: [300, 300],
     platformSpawnRange: [0, 0],
     platformSizeRange: [90, 300],
     platformHeightRange: [-5, 5],
     platformHeightScale: 20,
-    platformVerticalLimit: [0.8, 0.8],
+    platformVerticalLimit: [0.8, 0.8]
 }
 
 // Inicio
-window.onload = function() {
+window.onload = function () {
     game = initGame();
 }
 
@@ -43,7 +47,7 @@ function defaultConfiguration() {
         type: Phaser.AUTO,
         width: 800,
         height: 600,
-        physics: { 
+        physics: {
             default: 'arcade', // configura fisica do game estilo arcade
         },
         scene: [preloadGame, playGame] // carrega a classe 'preLoad' e carrega a classe 'playGame'
@@ -58,44 +62,54 @@ class preloadGame extends Phaser.Scene {
 
     //Carrega os assets e sprite sheets
     preload() {
-        this.load.image('platform', 'assets/teste.png');
+        this.load.spritesheet("tree", "assets/tree.png", { frameWidth: 60, frameHeight: 95 });
+        this.load.image('platform', 'assets/platform.png');
         this.load.image('background', 'assets/background2.png');
-        this.load.spritesheet('dude', 'assets/mike-running.png', {frameWidth: 84, frameHeight: 93});
+        this.load.spritesheet('dude', 'assets/mike-running.png', { frameWidth: 84, frameHeight: 93 });
     }
-    
     // Carrega animacao do Player
     create() {
-        this.anims.create( {
+        this.anims.create({
             key: 'run',
-            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 7}),
+            frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 7 }),
             frameRate: 16,
             repeat: -1
         })
 
         // Instancia a variavel que ira controlar a movimentacao do player
         cursors = this.input.keyboard.createCursorKeys();
-
         this.scene.start("PlayGame");
-    } 
+        //this.physics.add.collider(this.player, this.trees, encostaBomba, null, this); 
+    }
 }
 
 class playGame extends Phaser.Scene {
     constructor() {
         super('PlayGame');
     }
-    
+
     // Desenha/exibe a imagem que foi carregada no preload e cria outros 'Game Objects'
     create() {
+
         // Exibe background
         this.add.image(game.config.width / 2, game.config.height / 2, 'background');
 
         // keeping track of added platforms
         this.addedPlatforms = 0;
 
+        // Adiciona o jogador
+        this.player = this.physics.add.sprite(gameOptions.playerStartXY[0], gameOptions.playerStartXY[1], 'dude');
+        this.player.setBounce(gameOptions.playerBounce);
+        this.player.setGravityY(gameOptions.gravity);
+        this.player.anims.play('run');
+
+        this.trees = this.physics.add.group();
+        this.physics.add.collider(this.player, this.trees, treeColider, null, this);
+
         // group with all active platforms.
         this.platformGroup = this.add.group({
             // once a platform is removed, it's added to the pool
-            removeCallback: function(platform){
+            removeCallback: function (platform) {
                 platform.scene.platformPool.add(platform)
             }
         });
@@ -103,7 +117,7 @@ class playGame extends Phaser.Scene {
         // platform pool
         this.platformPool = this.add.group({
             // once a platform is removed from the pool, it's added to the active platforms group
-            removeCallback: function(platform){
+            removeCallback: function (platform) {
                 platform.scene.platformGroup.add(platform)
             }
         });
@@ -111,24 +125,56 @@ class playGame extends Phaser.Scene {
         // Adiciona plataforma ao game
         this.addPlatform(game.config.width * 3, gameOptions.platformX, gameOptions.platformY);
 
-        // Adiciona o jogador
-        this.player = this.physics.add.sprite(gameOptions.playerStartXY[0], gameOptions.playerStartXY[1], 'dude');
-        this.player.setBounce(gameOptions.playerBounce);
-        this.player.setGravityY(gameOptions.gravity);
-
         // Colisao Player X Plataforma
-        this.physics.add.collider(this.player, this.platformGroup, function(){
-            if(!this.player.anims.isPlaying){
-                this.player.anims.play('run');
-            }
-        }, null, this);
+        this.physics.add.collider(this.player, this.platformGroup);
 
         // Cria objeto de pontuacao
         pontuacaoText = criaObjetoPontuacao(this);
+        levelText = createTextLevel(this);
     }
 
+    incrementSeconds = () => {
+        seconds += 1;
+        count ++;
+
+        const initiallimit = 5;
+        let limit = 
+         level == 2 ? 4 :
+         level == 3 ? 3 : 
+         level == 4 ? 2 : initiallimit;
+
+console.log(limit);
+
+        if (count >= limit){
+            this.createTree(game.config.width, game.config.height - 70, platformVelocity);
+            count = 0;
+        }
+
+        if (seconds % 5 == 0) {
+            pontuacao += 10;
+            pontuacaoText.setText('Pontuação: ' + pontuacao);
+        }
+
+        this.setLevel();
+    }
+
+    setLevel = () => {
+        if (pontuacao >= 120)
+            level = 4;
+        else
+            if (pontuacao >= 60)
+                level = 3;
+            else
+                if (pontuacao >= 30)
+                    level = 2;
+
+        levelText.setText("Nível " + level);
+    }
+
+    timer = setInterval(this.incrementSeconds, 1000);
+
     addPlatform(platformWidth, X, Y) {
-        this.addedPlatforms ++;
+        this.addedPlatforms++;
         var platform;
         if (this.platformPool.getLength()) {
             platform = this.platformPool.getFirst();
@@ -149,25 +195,32 @@ class playGame extends Phaser.Scene {
         }
 
         this.nextPlatformDistance = Phaser.Math.Between(gameOptions.platformSpawnRange[0], gameOptions.platformSpawnRange[1]);
+        platformVelocity = platform.body.velocity.x;
     }
+
+
+    createTree = (posX, posY, velocity) => {
+        let tree = this.trees.create(posX, posY, "tree");
+
+        //tree.setCollideWorldBounds(true);
+        tree.setImmovable(true);
+        tree.setVelocityX(velocity);
+        tree.setScale(getRandom(0.8, 1.2), getRandom(0.8, 1.2));
+        tree.setDepth(1);
+    }
+
 
     // Atualiza os desenhos e objetos criados
     update() {
+
+        if (gameOver) return;
+
         var pointer = this.input.activePointer;
-
-        count++;
-
-        if ((count == countLimite) || countLimite <= 0) {
-            count = 0;
-            countLimite -= 10;
-            pontuacao += 10;
-            pontuacaoText.setText('Pontuação: ' + pontuacao);
-        }
 
         // Configura botao e altura do pulo
         if (pointer.isDown || cursors.space.isDown) {
             if (this.player.body.touching.down) {
-                this.player.setVelocityY(gameOptions.playerJump * - 1);
+                this.player.setVelocityY(gameOptions.playerJump * - 2);
             }
         }
 
@@ -176,13 +229,13 @@ class playGame extends Phaser.Scene {
         // Removendo plataformas
         var minDistance = game.config.width;
         var rightmostPlatformHeight = 0;
-        this.platformGroup.getChildren().forEach(function(platform) {
+        this.platformGroup.getChildren().forEach(function (platform) {
             var platformDistance = game.config.width - platform.x - platform.displayWidth / 2;
-            if(platformDistance < minDistance) {
+            if (platformDistance < minDistance) {
                 minDistance = platformDistance;
                 rightmostPlatformHeight = platform.y;
             }
-            if(platform.x < - platform.displayWidth / 2) {
+            if (platform.x < - platform.displayWidth / 2) {
                 this.platformGroup.killAndHide(platform);
                 this.platformGroup.remove(platform);
             }
@@ -210,44 +263,34 @@ class playGame extends Phaser.Scene {
     }
 }
 
-// Desabilita exibicao da estrela coletada/colidida
-function coletaEstrela(player, estrela) {
-    estrela.disableBody(true, true);
-    pontuacao += 10;
-    pontuacaoText.setText('Pontuacao: ' + pontuacao);
-
-    if (estrelas.countActive(true) === 0) {
-        estrelas.children.iterate(function(child) {
-            child.enableBody(true, child.x, 0, true, true);
-        });
-
-        var x = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);
-
-        var bomb = bombs.create(x, 16, 'bomb');
-        bomb.setBounce(1);
-        bomb.setCollideWorldBounds(true);
-        bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
-    }
-    
+function getRandom(min, max) {
+    return Math.random() * (max - min) + min;
 }
 
 // Game over
-function encostaBomba(player, bomb) {
+function treeColider(player, tree) {
+    clearInterval(this.timer);
     this.physics.pause();
     player.setTint(0xff0000);
-    player.anims.play('turn');
+    player.anims.stop();
     gameOver = true;
 }
 
 // Cria texto de pontuacao
 function criaObjetoPontuacao(object) {
-    return object.add.text(16, 16, 'Pontuação: 0', { fontSize: '32px', fill: '#fff' });
+    return object.add.text(16, 16, 'Pontuação: 0', { fontFamily: 'MV Boli', fontSize: '25px', fill: '#fff' });
 }
+
+
+createTextLevel = (object) => {
+    return object.add.text(game.config.width - 150, 16, 'Nível: 0', { fontFamily: 'MV Boli', fontSize: '25px', fill: '#fff' });
+}
+
 
 function animacaoPlayerEsquerda(object) {
     return {
         key: 'left',
-        frames: object.anims.generateFrameNumbers('dude', { start: 0, end: 7}),
+        frames: object.anims.generateFrameNumbers('dude', { start: 0, end: 7 }),
         frameRate: 16,
         repeat: -1
     }
@@ -256,7 +299,7 @@ function animacaoPlayerEsquerda(object) {
 function animacaoPlayerDireita(object) {
     return {
         key: 'right',
-        frames: object.anims.generateFrameNumbers('dude', { start: 0, end: 7}),
+        frames: object.anims.generateFrameNumbers('dude', { start: 0, end: 7 }),
         frameRate: 16,
         repeat: -1
     }
@@ -265,7 +308,7 @@ function animacaoPlayerDireita(object) {
 function animacaoPlayerFrente() {
     return {
         key: 'turn',
-        frames: [ { key: 'dude', frame: 0} ],
+        frames: [{ key: 'dude', frame: 0 }],
         frameRate: 16
     }
 }
@@ -274,7 +317,7 @@ function animacaoPlayerCorrer(object) {
     console.log('animacao player')
     return {
         key: 'correr',
-        frames: object.anims.generateFrameNumbers('dude', { start: 0, end: 7}),
+        frames: object.anims.generateFrameNumbers('dude', { start: 0, end: 7 }),
         frameRate: 16,
         repeat: -1
     }
