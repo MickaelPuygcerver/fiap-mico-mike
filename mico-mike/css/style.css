@@ -1,3 +1,67 @@
 body {
-    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+
+.container{
+    width: 100%;
+    height: 100%;
+}
+
+.manual{
+    display: inline-block;
+    text-align: right;
+    width: 100%;
+}
+
+.tituloJogo{
+    display: inline-block;
+    position: fixed;
+    top: 2%;
+    left: 68%;
+}
+
+.storyTelling{
+    display: inline-block;
+    position: fixed;
+    top: 10%;
+    left: 42%;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.tituloInstrucoes{
+    display: inline-block;
+    position: fixed;
+    top: 25%;
+    left: 68%;
+}
+
+.instrucoes{
+    display: inline-block;
+    position: fixed;
+    top: 33%;
+    left: 50%;
+    text-align: center;
+    line-height: 1.6;
+
+}
+
+@media (max-width: 1280px)
+{
+    .tituloJogo{
+        left: 75%;
+    }
+
+    .storyTelling{
+        left: 63%;
+    }
+
+    .tituloInstrucoes{
+        left: 75%;
+    }
+
+    .instrucoes{
+        left: 63%;
+    }
 }
